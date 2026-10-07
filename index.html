@@ -35,7 +35,10 @@ canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
 .hotCard{border:2px solid rgba(255,154,60,.55);box-shadow:0 0 0 1px rgba(255,255,255,.08) inset,0 0 50px rgba(255,120,40,.25),0 0 80px rgba(220,30,60,.3)}
 .row{display:flex;gap:calc(var(--u) * 14);align-items:center;flex-wrap:wrap;justify-content:center}
 .titleMid{display:flex;gap:calc(var(--u) * 26);align-items:center;flex-wrap:wrap;justify-content:center}
-#tcv{width:calc(var(--u) * 250);height:calc(var(--u) * 250);border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.12),rgba(255,255,255,0) 70%)}
+/* 画面が低いときに 中身が つぶれないように（はみ出したら 上から スクロール） */
+.screen{justify-content:safe center}
+.screen>*{flex-shrink:0}
+#tcv{flex:none;width:calc(var(--u) * 250);height:calc(var(--u) * 250);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.12),rgba(255,255,255,0) 70%)}
 .btn{font-family:'Dela Gothic One',sans-serif;font-size:max(22px,calc(var(--u) * 52));color:#fff;border:3px solid #fff3b0;border-radius:999px;padding:.25em 1.5em;cursor:pointer;position:relative;overflow:hidden;
   background:linear-gradient(90deg,#ff3b3b,#ff9a3c,#ffe14d);box-shadow:0 calc(var(--u) * 8) 0 #8a1020,0 0 44px rgba(255,60,60,.75),0 0 90px rgba(255,200,80,.35);text-shadow:0 3px 0 rgba(0,0,0,.25);transition:transform .08s}
 .btn:active{transform:translateY(6px);box-shadow:0 2px 0 #8a1020}
@@ -590,10 +593,13 @@ function drawQuiet(t){
 function drawTitleTeacher(t){
   const r=tcv.getBoundingClientRect(),d=Math.min(window.devicePixelRatio||1,2);
   if(!r.width)return;
-  if(tcv.width!==Math.round(r.width*d)){tcv.width=Math.round(r.width*d);tcv.height=Math.round(r.height*d)}
-  tg.setTransform(1,0,0,1,0,0);tg.clearRect(0,0,tcv.width,tcv.height);
-  const s=tcv.width/250,a=previewA;
-  tg.save();tg.beginPath();tg.arc(tcv.width/2,tcv.height/2,tcv.width/2,0,TAU);tg.clip();
+  const cw=Math.round(r.width*d),ch=Math.round(r.height*d);
+  if(tcv.width!==cw||tcv.height!==ch){tcv.width=cw;tcv.height=ch}
+  tg.setTransform(1,0,0,1,0,0);tg.clearRect(0,0,cw,ch);
+  // 縦横が ちがっても、まんなかの 正方形に おさめて描く
+  const sz=Math.min(cw,ch),s=sz/250,a=previewA;
+  tg.translate((cw-sz)/2,(ch-sz)/2);
+  tg.save();tg.beginPath();tg.arc(sz/2,sz/2,sz/2,0,TAU);tg.clip();
   const j=a>.7?(a-.7)*10*s:0,im=imgOk(IMG.face[angerIdx(a)]);
   if(im)tg.drawImage(im,rand(-j,j),15*s+rand(-j,j),250*s,250*s);
   else drawTeacher(tg,125*s+rand(-j,j),105*s+rand(-j,j),58*s,a,t);
