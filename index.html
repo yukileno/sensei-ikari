@@ -198,7 +198,7 @@ function sampleAudio(dt,t){
     A.an.getFloatTimeDomainData(A.tbuf);
     let s=0;for(let i=0;i<A.tbuf.length;i++)s+=A.tbuf[i]*A.tbuf[i];
     A.db=10*Math.log10(s/A.tbuf.length+1e-12);
-    A.raw=(A.db-(A.floor+6))/cfg.range;
+    A.raw=(A.db-(A.floor+Math.min(6,cfg.range/2)))/cfg.range; // 感度が高いほど しずかな音との さも 小さくする
   }else{A.db=-100;A.raw=-1}
   if(demoHold)A.raw=TH+.3+Math.sin(t*5)*.08+rand(-.04,.04);
   const tgt=clamp(A.raw,0,MAXL);
@@ -242,7 +242,7 @@ const tpos=()=>({x:W/2,y:H*.45,R:Math.min(W*.12,H*.15)});
 
 // ================= state =================
 let mode='title'; // title|count|play|boom|result
-const cfg={range:LS.get('range',30)};
+const cfg={range:LS.get('range',12)}; // はじめは 感度20
 let curType=LS.get('type','normal');if(!TYPES[curType])curType='normal';
 const P={};
 function resetP(){Object.assign(P,{type:curType,elapsed:0,anger:0,aShow:0,hold:0,quietT:0,loudT:0,charging:false,idx:0,maxAnger:0,sayT:0,
@@ -681,12 +681,15 @@ function showResult(exploded){
 function backTitle(){parts=[];texts=[];rings=[];refreshTitle();show('title')}
 
 // ---- マイク感度（プレイ中に ↑↓ キーか ＋− ボタンで変える）
-// range が小さいほど よく反応する。画面には 1〜20 の「感度」で出す
+// range が小さいほど よく反応する。画面には 1〜40 の「感度」で出す
+// 1〜20 は range を 2 ずつ、21〜40 は さらに こまかく へらして とても小さな声でも反応するようにする
+const SENS_MAX=40;
+const rangeOf=lv=>lv<=20?50-(lv-1)*2:12-(lv-20)*.5;
 let sensHotT=null;
-const sensLevel=()=>Math.round((50-cfg.range)/2)+1;
+const sensLevel=()=>cfg.range>=12?Math.round((50-cfg.range)/2)+1:clamp(Math.round(20+(12-cfg.range)*2),21,SENS_MAX);
 function renderSens(){$('#sensN').textContent=sensLevel()}
 function changeSens(d){
-  cfg.range=clamp(cfg.range-d*2,12,50);LS.set('range',cfg.range);renderSens();
+  cfg.range=rangeOf(clamp(sensLevel()+d,1,SENS_MAX));LS.set('range',cfg.range);renderSens();
   const b=$('#sensBox');b.classList.add('hot');clearTimeout(sensHotT);sensHotT=setTimeout(()=>b.classList.remove('hot'),1500);
 }
 
