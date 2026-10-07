@@ -674,7 +674,7 @@ function backTitle(){parts=[];texts=[];rings=[];refreshTitle();show('title')}
 let sensHotT=null;
 function renderSens(){$('#sensN').textContent=cfg.line}
 function changeSens(d){
-  cfg.line=clamp(cfg.line+d*2,30,90);LS.set('line',cfg.line);renderSens();
+  cfg.line=clamp(cfg.line+d*2,0,60);LS.set('line',cfg.line);renderSens();
   const b=$('#sensBox');b.classList.add('hot');clearTimeout(sensHotT);sensHotT=setTimeout(()=>b.classList.remove('hot'),1500);
 }
 
