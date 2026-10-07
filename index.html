@@ -120,7 +120,7 @@ canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block}
 </div>
 
 <button class="btn2" id="stopBtn">おわる ■</button>
-<div id="sensBox"><span>マイク感度 <b id="sensN"></b></span><button class="btn2" id="sensDn" title="反応ひかえめに（↓キー）">−</button><button class="btn2" id="sensUp" title="よく反応するように（↑キー）">＋</button><small>↑↓キーでも かえられます</small></div>
+<div id="sensBox"><span>うるさい ライン <b id="sensN"></b>dB</span><button class="btn2" id="sensDn" title="ラインを さげる＝小さな声でも おこる（↓キー）">−</button><button class="btn2" id="sensUp" title="ラインを あげる＝大きな声まで おこらない（↑キー）">＋</button><small>↑↓キーでも かえられます</small></div>
 
 <script>
 'use strict';
@@ -177,7 +177,7 @@ fetch('img/list.json',{cache:'no-store'}).then(r=>r.json()).then(a=>{
 }).catch(()=>{});
 
 // ================= audio =================
-const A={ctx:null,an:null,tbuf:null,ready:false,db:-100,raw:0,lvl:0,floor:-60};
+const A={ctx:null,an:null,tbuf:null,ready:false,db:-100,raw:0,lvl:0};
 // スペースキー（またはマウス）を押している間は、マイクの代わりに「うるさい」ことにする（動作の確認用）
 let demoHold=false;
 async function initMic(){
@@ -198,7 +198,8 @@ function sampleAudio(dt,t){
     A.an.getFloatTimeDomainData(A.tbuf);
     let s=0;for(let i=0;i<A.tbuf.length;i++)s+=A.tbuf[i]*A.tbuf[i];
     A.db=10*Math.log10(s/A.tbuf.length+1e-12);
-    A.raw=(A.db-(A.floor+Math.min(6,cfg.range/2)))/cfg.range; // 感度が高いほど しずかな音との さも 小さくする
+    // 決まった音の大きさ（dB）で判定する。うるさい ライン ちょうどで TH、24dB 上がるごとに 1 ふえる
+    A.raw=TH+(A.db-(cfg.line-DB_OFS))/24;
   }else{A.db=-100;A.raw=-1}
   if(demoHold)A.raw=TH+.3+Math.sin(t*5)*.08+rand(-.04,.04);
   const tgt=clamp(A.raw,0,MAXL);
@@ -242,7 +243,8 @@ const tpos=()=>({x:W/2,y:H*.45,R:Math.min(W*.12,H*.15)});
 
 // ================= state =================
 let mode='title'; // title|count|play|boom|result
-const cfg={range:LS.get('range',12)}; // はじめは 感度20
+const DB_OFS=100;
+const cfg={line:LS.get('line',56)}; // うるさい ライン（dB）
 let curType=LS.get('type','normal');if(!TYPES[curType])curType='normal';
 const P={};
 function resetP(){Object.assign(P,{type:curType,elapsed:0,anger:0,aShow:0,hold:0,quietT:0,loudT:0,charging:false,idx:0,maxAnger:0,sayT:0,
@@ -286,12 +288,7 @@ function explodeTeacher(){
 function updateCount(dt){
   const {x,y,R}=tpos();
   cd.t+=dt;
-  if(cd.t<1.6){cd.samples.push(A.db);return}
-  if(!cd.floorSet){
-    cd.floorSet=true;
-    if(A.ready&&cd.samples.length){const s=cd.samples.slice().sort((a,b)=>a-b);A.floor=clamp(s[Math.floor(s.length*.3)],-85,-15)}
-  }
-  const k=Math.floor((cd.t-1.6)/.8);
+  const k=Math.floor(cd.t/.8);
   if(k!==cd.step){
     cd.step=k;
     if(k<3){addText(String(3-k),x,y-R*.2,240*U,['#3ff6ff','#ffe14d','#ff9a3c'][k],.8,0);ring(x,y,R,1100*U,12*U,'#fff',.7);shake=8}
@@ -571,22 +568,14 @@ function drawMeter(t){
   g.fillStyle=loud?'#ff4d4d':A.lvl>TH*.6?'#ffe14d':'#5dff8a';g.fillRect(x,y,w*l,h);g.restore();
   g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=2*U;rr(g,x,y,w,h,h/2);g.stroke();
   g.strokeStyle='#ff4d4d';g.lineWidth=4*U;g.beginPath();g.moveTo(x+w*thr,y-8*U);g.lineTo(x+w*thr,y+h+8*U);g.stroke();
-  g.textBaseline='bottom';g.font=font(18*U);g.textAlign='left';g.fillStyle='rgba(255,255,255,.8)';g.fillText('こえの おおきさ',x,y-6*U);
-  g.textAlign='center';g.fillStyle='#ff8080';g.fillText('ここから うるさい',x+w*thr,y-6*U);
+  g.textBaseline='bottom';g.font=font(18*U);g.textAlign='left';g.fillStyle='rgba(255,255,255,.8)';g.fillText(`こえの おおきさ ${A.ready?Math.max(0,Math.round(A.db+DB_OFS))+'dB':''}`,x,y-6*U);
+  g.textAlign='center';g.fillStyle='#ff8080';g.fillText(`ここから うるさい（${cfg.line}dB）`,x+w*thr,y-6*U);
   let st,col;
   if(P.charging){st='うるさい！ いかり チャージ中';col=Math.sin(t*14)>0?'#ff4d4d':'#fff'}
   else if(loud){st='うるさい…？';col='#ff9a3c'}
   else if(A.lvl>TH*.6){st='にぎやか';col='#ffe14d'}
   else{st=P.quietT>2&&P.anger>0?'しずか♪ いかりが へっていく':'しずか♪';col='#5dff8a'}
   g.textAlign='right';g.font=font(24*U,true);g.fillStyle=col;g.fillText(st,x+w,y-4*U);
-  g.restore();
-}
-function drawQuiet(t){
-  if(mode!=='count'||cd.t>=1.6)return;
-  const {x,y,R}=tpos();
-  g.save();g.textAlign='center';g.textBaseline='middle';
-  g.font=font(76*U,true);g.fillStyle=`rgba(255,255,255,${.7+.3*Math.sin(t*6)})`;g.fillText('しーっ…',x,y-R*1.9);
-  g.font=font(26*U);g.fillStyle='#fff';g.fillText('まわりの 音を はかっています',x,y+R*1.6);
   g.restore();
 }
 // タイトルの 先生（いかりが ゆっくり たまったり へったり する見本）
@@ -620,7 +609,7 @@ function frame(now){
   const inGame=mode==='play'||mode==='count'||mode==='boom';
   if(inGame)drawTeacherScene(t);
   drawParts();drawRings();
-  if(inGame){drawBubble(t);drawGauge(t);if(mode!=='boom')drawMeter(t);drawQuiet(t)}
+  if(inGame){drawBubble(t);drawGauge(t);if(mode!=='boom')drawMeter(t)}
   drawTexts();
   g.restore();
   if(flash>0){g.fillStyle=`rgba(${flashColor},${flash*.6})`;g.fillRect(0,0,W,H)}
@@ -649,7 +638,7 @@ async function startGame(){
   await initMic();
   resetP();parts=[];rings=[];texts=[];
   renderSens();show(null);mode='count';
-  cd={t:A.ready?0:1.6,samples:[],step:-1,floorSet:false};
+  cd={t:0,step:-1};
 }
 function finish(){
   if(mode==='count'){backTitle();return}
@@ -680,16 +669,12 @@ function showResult(exploded){
 }
 function backTitle(){parts=[];texts=[];rings=[];refreshTitle();show('title')}
 
-// ---- マイク感度（プレイ中に ↑↓ キーか ＋− ボタンで変える）
-// range が小さいほど よく反応する。画面には 1〜40 の「感度」で出す
-// 1〜20 は range を 2 ずつ、21〜40 は さらに こまかく へらして とても小さな声でも反応するようにする
-const SENS_MAX=40;
-const rangeOf=lv=>lv<=20?50-(lv-1)*2:12-(lv-20)*.5;
+// ---- うるさい ライン（プレイ中に ↑↓ キーか ＋− ボタンで変える）
+// マイクの音の大きさ（dBFS）に DB_OFS を足して、ふつうの dB に ちかい数字で 出す（マイクによって ずれるので めやす）
 let sensHotT=null;
-const sensLevel=()=>cfg.range>=12?Math.round((50-cfg.range)/2)+1:clamp(Math.round(20+(12-cfg.range)*2),21,SENS_MAX);
-function renderSens(){$('#sensN').textContent=sensLevel()}
+function renderSens(){$('#sensN').textContent=cfg.line}
 function changeSens(d){
-  cfg.range=rangeOf(clamp(sensLevel()+d,1,SENS_MAX));LS.set('range',cfg.range);renderSens();
+  cfg.line=clamp(cfg.line+d*2,30,90);LS.set('line',cfg.line);renderSens();
   const b=$('#sensBox');b.classList.add('hot');clearTimeout(sensHotT);sensHotT=setTimeout(()=>b.classList.remove('hot'),1500);
 }
 
